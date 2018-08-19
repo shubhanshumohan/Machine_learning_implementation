@@ -1,0 +1,100 @@
+# Practical Machine Learning Assignment
+
+## Introduction to the project <br>
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.The goal of your project is to predict the manner in which they did the exercise.<br>
+
+## Data Sources
+The training Datset set is available at:<br>[Training Dataset](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)
+
+The testing Dataset is available at:<br>
+[Testing Dataset](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+
+# Data Exploration
+```{r}
+library(caret)
+library(ggplot2)
+library(rattle)
+library(randomForest)
+```
+
+Reading the training and testing Dataset:<br>
+```{r}
+training<-read.csv("training.csv")[,c(-1)]#as they are just row numbers
+testing<-read.csv("testing.csv")[,c(-1)]# as they are just row numbers
+dim(training)
+dim(testing)
+```
+
+As it can be seen that the data is multidimensional and hence the columns with approximately zero variance should be removed.Approaches such as Principal component analysis could also be used.<br>
+Rows with NA values should also be removed.
+
+## Data preprocessing<br>
+The focus of preprocessing will be remove zero variance variables and the rows with NA values.
+The exact preprocessing will be done on the testing dataset as well.
+```{r}
+nzv<-nearZeroVar(training)
+#this variable contains the columns with almost zero variance
+training<-training[,-nzv]
+testing<-testing[,-nzv]
+dim(training)
+dim(testing)
+```
+
+Now removing the variables with more than 60% NA values,as they wont be much impactful for prediction model.<br>
+```{r}
+NaValues<-sapply(training ,function(x) mean(is.na(x))>0.6)
+training<-training[,NaValues==FALSE]
+testing<-testing[,NaValues==FALSE]
+# removing the id and time variables as they wont effect the model
+training <- training[,-c(1:5)]
+testing <- testing[,-c(1:5)]
+
+dim(training)
+dim(testing)
+```
+
+By removing Zero variance predictors and majorly NA values predictors,along with principal component analysis,potential predictors are reduced to 28 from 160.
+
+## Training Models<br>
+Creating validation dataset:<br>
+```{r}
+ind<-createDataPartition(training$classe,p=0.75,list=FALSE)
+training<-training[ind,]
+validation<-training[-ind,]
+dim(training)
+dim(validation)
+```
+
+As this is classification problem,we will try using decision trees,random forests,boosting an d combining models using Model Stacking.<br>
+
+### Prediction using Decision trees<br>
+```{r,cache=T}
+model1<-train(classe~.,data=training,method="rpart",trControl=trainControl(method="cv"))
+pred1<-predict(model1,validation)
+confusionMatrix(factor(pred1),factor(validation$classe))
+qplot(pred1,validation$classe,xlab="Predictions through decision tree",ylab="Actual values of the classe variable",geom=c("jitter"))
+fancyRpartPlot(model1$finalModel)
+
+```
+
+The above plot shows the decision tree used for prediction.
+
+### Prediction using random forest<br>
+```{r}
+model2<-randomForest(classe~.,data=training)
+pred2<-predict(model2,validation)
+confusionMatrix(factor(pred2),factor(validation$classe))
+qplot(pred2,validation$classe,xlab="Predictions through random forest",ylab="Actual values of the classe variable")
+plot(model2)
+```
+
+*It can be seen that random forest technique has a very high accuracy.Hence it will be our final model for prediction.The error rate of the model is very low,as is apparent by the diagnostic plot*
+
+## Prediction for the test set<br>
+```{r}
+final_pred<-predict(model2,testing)
+final_pred
+```
+
+
+
